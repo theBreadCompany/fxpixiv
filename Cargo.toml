@@ -1,0 +1,14 @@
+[package]
+name = "pxiv"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+tl = "0.7.8"
+reqwest = "0.12.7"
+json = "0.12.4"
+rocket = "0.5.1"
+scraper = "0.20.0"
+markup5ever = "0.13.0"
+tendril = "0.4.3"
+html5ever = "0.28.0"
