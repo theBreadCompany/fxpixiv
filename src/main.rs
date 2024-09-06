@@ -1,17 +1,10 @@
 #[macro_use] extern crate rocket;
-#[macro_use] extern crate json;
-#[macro_use] extern crate markup5ever;
-
 
 use rocket::response::content::RawHtml;
 use rocket::http::Status;
-use rocket::http::uri::Segments;
 use reqwest::Client;
 use scraper::{Html, Selector};
-use html5ever::tree_builder::TreeSink;
-use tendril::Tendril;
-use markup5ever::{Attribute, QualName, LocalName};
-use markup5ever::interface::tree_builder::TreeSink;
+use maud::{html, DOCTYPE};
 
 #[get("/<path..>")]
 async fn handle_route(path: std::path::PathBuf) -> Result<RawHtml<String>, Status> {
@@ -22,7 +15,7 @@ async fn handle_route(path: std::path::PathBuf) -> Result<RawHtml<String>, Statu
         Err(err) => return Err(err), 
     };
 
-    let modified = change_meta(&html).await.unwrap();
+    let modified = create_page(&target, &html).await.unwrap();
 
     Ok(RawHtml(modified))
 }
@@ -43,51 +36,51 @@ async fn fetch_content(url: &String) -> Result<String, Status> {
     Ok(html)
 }
 
-async fn change_meta(html: &String) -> Result<String, Status> {
+async fn create_page(source: &String, html: &String) -> Result<String, Status> {
     let dom = Html::parse_document(html);
+
     let data_selector = match Selector::parse(r#"meta[name="preload-data"]"#) {
         Ok(sel) => sel,
-        Err(_) => return Ok(html.to_string()),
+        Err(_) => return Err(Status::InternalServerError),
     };
     let data_meta = match dom.select(&data_selector).next() {
         Some(meta) => meta,
-        None => return Ok(html.to_string()),
+        None => return Err(Status::InternalServerError),
     };
 
-    let illust = json::parse(data_meta.value().attr("content").unwrap());
-    let target_url = illust.unwrap()["illust"].entries().next().unwrap().1["urls"]["regular"].as_str().unwrap();
+    let illust = json::parse(data_meta.value().attr("content").unwrap()).unwrap();
+    let target_url = match illust["illust"].entries().next() {
+        Some (j) => j.1["urls"]["regular"].as_str().unwrap().replace("pximg.net", "thebread.dev"),
+        None => "https://http.cat/images/501.jpg".to_string(),
+    };
 
-
-    let image_selector = match Selector::parse(r#"meta[name="og:image"]"#) {
+    let title_selector = match Selector::parse(r#"meta[name="og:title"]"#) {
         Ok(sel) => sel,
-        Err(_) => return Ok(html.to_string()),
+        Err(_) => return Err(Status::InternalServerError),
     };
-    let image_meta = match dom.select(&image_selector).next() {
-        Some(meta) => meta,
-        None => return Ok(html.to_string()),
+    let title_meta = match dom.select(&title_selector).next() {
+        Some(meta) => meta.attr("content").unwrap(),
+        None => "unknown title"
     };
 
-    let parent = image_meta.parent().unwrap();
-    dom.remove_from_parent(image_meta);
-    dom.create_element("meta", vec![
-        Attribute { name: QualName::new(
-            None,
-            ns!(html),
-            LocalName::from("name"),
-        ),
-            value: Tendril::from("og:image")
-        }, 
-        Attribute { name: QualName::new(
-            None,
-            ns!(html),
-            LocalName::from("content"),
-        ),
-            value: Tendril::from(target_url)
-        } 
-    ]);
-
-
-    Ok(html.to_string())
+    Ok(html! {
+        (DOCTYPE)
+        html lang="en" {
+            head {
+                meta charset="utf-8";
+                meta property="og:title" content=(title_meta);
+                meta property="og:image" content=(target_url);
+                meta property="og:url" content=(source);
+                meta http-equiv="Refresh" content=(format!("0; url='{}'", source));
+            }
+            body {
+                h1 { "pxiv.net" }
+                h2 { "your (not yet so) friendly pixiv embed helper" }
+                p { "This page will take you to the original one one pixiv - if not, "}
+                a href=(source) { "refresh manually" }
+            }
+        }
+    }.into_string())
 }
 
 #[launch]
