@@ -49,16 +49,24 @@ async fn create_page(source: &String, html: &String) -> Result<String, Status> {
     };
 
     let illust = json::parse(data_meta.value().attr("content").unwrap()).unwrap();
-    let target_url = match illust["illust"].entries().next() {
+    let image = match illust["illust"].entries().next() {
         Some (j) => j.1["urls"]["regular"].as_str().unwrap().replace("pximg.net", "thebread.dev"),
         None => "https://http.cat/images/501.jpg".to_string(),
     };
 
-    let title_selector = match Selector::parse(r#"meta[name="og:title"]"#) {
+    let title_selector = match Selector::parse(r#"meta[property="og:title"]"#) {
         Ok(sel) => sel,
         Err(_) => return Err(Status::InternalServerError),
     };
     let title_meta = match dom.select(&title_selector).next() {
+        Some(meta) => meta.attr("content").unwrap(),
+        None => "unknown title"
+    };
+    let desc_selector = match Selector::parse(r#"meta[property="og:description"]"#) {
+        Ok(sel) => sel,
+        Err(_) => return Err(Status::InternalServerError),
+    };
+    let desc_meta = match dom.select(&desc_selector).next() {
         Some(meta) => meta.attr("content").unwrap(),
         None => "unknown title"
     };
@@ -68,12 +76,22 @@ async fn create_page(source: &String, html: &String) -> Result<String, Status> {
         html lang="en" {
             head {
                 meta charset="utf-8";
+
                 meta property="og:title" content=(title_meta);
-                meta property="og:image" content=(target_url);
+                meta property="og:image" content=(image);
                 meta property="og:url" content=(source);
                 meta property="og:type" content="article";
                 meta property="og:site_name" content="pixiv";
-                meta name="robots" content="max-image-preview:large";
+                meta property="og:description" content=(desc_meta);
+
+                meta property="twitter:card" content="summary_large_image";
+                meta property="twitter:site" content="@pixiv";
+                meta property="twitter:url" content=(source);
+                meta property="twitter:title" content=(title_meta);
+                meta property="twitter:description" content=(desc_meta);
+                meta property="twitter:image" content=(image);
+
+
                 meta http-equiv="Refresh" content=(format!("0; url='{}'", source));
             }
             body {
