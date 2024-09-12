@@ -1,5 +1,4 @@
-{ pkgs ? import <nixpkgs> { system = builtins.currentSystem; }
-, lib ? pkgs.lib, rustPlatform ? pkgs.rustPlatform }:
+{ pkgs, lib, rustPlatform }:
 
 rustPlatform.buildRustPackage rec {
   pname = "pxiv";

@@ -1,26 +1,26 @@
-# rocket-service.nix
-{ config, pkgs, ... }:
+# pxiv.service.nix
+{ config, pkgs, lib, ... }:
 
 let
-  # Import the Rocket application package
-  pxivApp = import ./default.nix { inherit pkgs; };
+  inherit (lib) mkOption mkIf types;
+  pxivApp = import ./default.nix { inherit pkgs lib; rustPlatform = pkgs.rustPlatform; };
 in
 {
-  options.services.rocket = {
+  options.services.pxiv = {
     enable = mkOption {
       type = types.bool;
       default = false;
-      description = "Enable the Rocket application service.";
+      description = "Enable the pxiv embed helper service.";
     };
 
     port = mkOption {
       type = types.int;
       default = 8000;
-      description = "Port on which the Rocket application listens.";
+      description = "Port on which the pxiv embed helper listens.";
     };
   };
 
-  config = mkIf config.services.rocket.enable {
+  config = mkIf config.services.pxiv.enable {
     systemd.services.pxiv = {
       description = "pxiv embed helper service";
       wantedBy = [ "multi-user.target" ];
@@ -29,7 +29,7 @@ in
       serviceConfig.ExecStart = "${pxivApp}/bin/pxiv";
 
       # Set the port environment variable
-      serviceConfig.Environment = [ "ROCKET_PORT=${toString config.services.rocket.port}" ];
+      serviceConfig.Environment = [ "ROCKET_PORT=${toString config.services.pxiv.port}" ];
 
       # Restart on failure
       serviceConfig.Restart = "always";
