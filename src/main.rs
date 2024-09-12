@@ -71,6 +71,9 @@ async fn create_page(source: &String, html: &String) -> Result<String, Status> {
                 meta property="og:title" content=(title_meta);
                 meta property="og:image" content=(target_url);
                 meta property="og:url" content=(source);
+                meta property="og:type" content="article";
+                meta property="og:site_name" content="pixiv";
+                meta name="robots" content="max-image-preview:large";
                 meta http-equiv="Refresh" content=(format!("0; url='{}'", source));
             }
             body {
