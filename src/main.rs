@@ -50,7 +50,7 @@ async fn create_page(source: &String, html: &String) -> Result<String, Status> {
 
     let illust = json::parse(data_meta.value().attr("content").unwrap()).unwrap();
     let image = match illust["illust"].entries().next() {
-        Some (j) => j.1["urls"]["regular"].as_str().unwrap().replace("pximg.net", "thebread.dev"),
+        Some (j) => j.1["urls"]["regular"].as_str().unwrap().replace("pximg.net", "fixiv.net"),
         None => "https://http.cat/images/501.jpg".to_string(),
     };
 
