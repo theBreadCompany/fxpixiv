@@ -95,7 +95,7 @@ async fn create_page(source: &String, html: &String) -> Result<String, Status> {
                 meta http-equiv="Refresh" content=(format!("0; url='{}'", source));
             }
             body {
-                h1 { "pxiv.net" }
+                h1 { "fxpixiv.net" }
                 h2 { "your (not yet so) friendly pixiv embed helper" }
                 p { "This page will take you to the original one one pixiv - if not, "}
                 a href=(source) { "refresh manually" }

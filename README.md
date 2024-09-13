@@ -1,4 +1,4 @@
-# pxiv
+# fxpixiv
 
 The pixiv embed fixer
 

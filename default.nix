@@ -1,7 +1,7 @@
 { pkgs, lib, rustPlatform }:
 
 rustPlatform.buildRustPackage rec {
-  pname = "pxiv";
+  pname = "fxpixiv";
   version = "0.1.0";
 
   src = ./.;

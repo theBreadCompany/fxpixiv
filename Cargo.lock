@@ -1318,7 +1318,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "pxiv"
+name = "fxpixiv"
 version = "0.1.0"
 dependencies = [
  "json",
