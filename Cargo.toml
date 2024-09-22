@@ -1,12 +1,6 @@
-[package]
-name = "fxpixiv"
-version = "0.1.0"
-edition = "2021"
+[workspace]
 
-[dependencies]
-tl = "0.7.8"
-reqwest = "0.12.7"
-json = "0.12.4"
-rocket = "0.5.1"
-scraper = "0.20.0"
-maud = "0.26.0"
+members = [
+    "fxpixiv",
+    "libpixiv",
+]
