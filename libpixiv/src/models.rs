@@ -15,7 +15,7 @@ pub struct Illustration {
     pub tools: Vec<String>,
     pub series: Option<String>,
     pub restrict: i32,
-    pub x_restrict: i32, 
+    pub x_restrict: i32,
     pub image_urls: IllustrationURLs,
     pub meta_pages: Vec<IllustrationURLsWrapper>,
     pub total_view: u32,
@@ -35,7 +35,7 @@ pub struct User {
     name: String,
     account: String,
     profile_image_urls: UserProfileImages,
-    is_followed: bool
+    is_followed: bool,
 }
 
 #[derive(Serialize, Deserialize, std::fmt::Debug)]

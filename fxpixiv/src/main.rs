@@ -1,10 +1,11 @@
-#[macro_use] extern crate rocket;
+#[macro_use]
+extern crate rocket;
 
-use rocket::response::content::RawHtml;
-use rocket::http::Status;
-use reqwest::Client;
-use scraper::{Html, Selector};
 use maud::{html, DOCTYPE};
+use reqwest::Client;
+use rocket::http::Status;
+use rocket::response::content::RawHtml;
+use scraper::{Html, Selector};
 
 #[get("/<path..>")]
 async fn handle_route(path: std::path::PathBuf) -> Result<RawHtml<String>, Status> {
@@ -12,7 +13,7 @@ async fn handle_route(path: std::path::PathBuf) -> Result<RawHtml<String>, Statu
 
     let html = match fetch_content(&target).await {
         Ok(html) => html,
-        Err(err) => return Err(err), 
+        Err(err) => return Err(err),
     };
 
     let modified = create_page(&target, &html).await.unwrap();
@@ -32,7 +33,7 @@ async fn fetch_content(url: &String) -> Result<String, Status> {
         Ok(text) => text,
         Err(_) => return Err(Status::InternalServerError),
     };
-    
+
     Ok(html)
 }
 
@@ -50,7 +51,10 @@ async fn create_page(source: &String, html: &String) -> Result<String, Status> {
 
     let illust = json::parse(data_meta.value().attr("content").unwrap()).unwrap();
     let image = match illust["illust"].entries().next() {
-        Some (j) => j.1["urls"]["regular"].as_str().unwrap().replace("pximg.net", "fixiv.net"),
+        Some(j) => j.1["urls"]["regular"]
+            .as_str()
+            .unwrap()
+            .replace("pximg.net", "fixiv.net"),
         None => "https://http.cat/images/501.jpg".to_string(),
     };
 
@@ -60,7 +64,7 @@ async fn create_page(source: &String, html: &String) -> Result<String, Status> {
     };
     let title_meta = match dom.select(&title_selector).next() {
         Some(meta) => meta.attr("content").unwrap(),
-        None => "unknown title"
+        None => "unknown title",
     };
     let desc_selector = match Selector::parse(r#"meta[property="og:description"]"#) {
         Ok(sel) => sel,
@@ -68,7 +72,7 @@ async fn create_page(source: &String, html: &String) -> Result<String, Status> {
     };
     let desc_meta = match dom.select(&desc_selector).next() {
         Some(meta) => meta.attr("content").unwrap(),
-        None => "unknown title"
+        None => "unknown title",
     };
 
     Ok(html! {
@@ -101,7 +105,8 @@ async fn create_page(source: &String, html: &String) -> Result<String, Status> {
                 a href=(source) { "refresh manually" }
             }
         }
-    }.into_string())
+    }
+    .into_string())
 }
 
 #[launch]
