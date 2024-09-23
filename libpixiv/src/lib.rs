@@ -2,18 +2,19 @@ extern crate md5;
 extern crate reqwest;
 extern crate serde_json;
 
-use chrono::{Local};
-use serde_json::{Value};
+use chrono::Local;
+use serde_json::Value;
 use std::sync::{Arc, Mutex};
-use reqwest::header::{HeaderName, USER_AGENT, CONTENT_TYPE};
+use reqwest::header::{HeaderName, AUTHORIZATION, CONTENT_TYPE, USER_AGENT};
 
+mod models;
 
 struct PixivAppClient {
     /// bearer token
     access_token: Arc<Mutex<String>>,
     refresh_token: Arc<Mutex<String>>,
     http_client: reqwest::Client,
-    host: &str,
+    host: String,
 }
 
 impl PixivAppClient {
@@ -22,7 +23,7 @@ impl PixivAppClient {
             access_token: Arc::new(Mutex::new(String::new())),
             refresh_token: Arc::new(Mutex::new(String::from(token))),
             http_client: reqwest::Client::new(),
-            host: "https://app-api.pixiv.net/"
+            host: String::from("https://app-api.pixiv.net"),
         };
         client
     }
@@ -53,14 +54,6 @@ impl PixivAppClient {
             .build()
             .expect("failed to build login request");
 
-        if let Some(body) = req.body() {
-            if let Some(bytes) = body.as_bytes() {
-                println!("Body: {}", String::from_utf8_lossy(bytes));
-            } else {
-                println!("Body: Non-text data or stream");
-            }
-        }
-
         let r = match self.http_client
             .execute(req)
             .await {
@@ -75,13 +68,52 @@ impl PixivAppClient {
         self.access_token = Arc::new(Mutex::new(String::from(d["response"]["access_token"].as_str().unwrap())));
         self.refresh_token = Arc::new(Mutex::new(String::from(d["response"]["refresh_token"].as_str().unwrap())));
     }
+
+    pub async fn illust_details(&self, illust_id: u32) -> Result<models::Illustration, Box<dyn std::error::Error>> {
+        let url = format!("{}/v1/illust/detail", self.host);
+        let illust_id_str = illust_id.to_string();
+
+        let req = self.http_client
+            .get(url)
+            .header(AUTHORIZATION, format!("Bearer {}", self.access_token.lock().unwrap()))
+            .header(HeaderName::from_lowercase(b"app-os").unwrap(), "ios")
+            .header(HeaderName::from_lowercase(b"app-os-version").unwrap(), "12.2")
+            .header(HeaderName::from_lowercase(b"app-version").unwrap(), "7.6.2")
+            .header(USER_AGENT, "PixivIOSApp/7.6.2 (iOS 12.2; iPhone9,1)")
+            .query(&[("illust_id", illust_id_str.as_str())])
+            .build()
+            .expect("failed to build request");
+        
+        let r = self.http_client
+            .execute(req)
+            .await
+            .unwrap()
+            .text()
+            .await
+            .unwrap();
+
+        println!("{}", r);
+
+        let deserialized = match serde_json::from_str::<models::PixivResult>(&r) {
+            Ok(r) => r,
+            Err(e) => return Err(Box::from(e)),
+        };
+
+
+
+        match deserialized.illust {
+            Some(r) => Ok(r),
+            None => Err(Box::from(deserialized.error.unwrap()))
+        }
+    }
+        
 }
 
 
 #[cfg(test)]
 mod client_tests {
     use super::*;
-    use std::{assert, panic, env};
+    use std::{assert, assert_eq, panic, env};
 
     #[tokio::test]
     async fn login() {
@@ -90,10 +122,19 @@ mod client_tests {
         client.refresh_token().await;
         let cloned_access_token = Arc::clone(&client.access_token);
         match cloned_access_token.lock() {
-            Ok(t) => assert!(!t.is_empty()),
+            Ok(t) => assert!(!t.is_empty(), "Expected to receive token!"),
             Err(_) => panic!("No token received!"),
         };
     }
 
-
+    #[tokio::test]
+    async fn illust_details() {
+        let illust_id = 122388293;
+        let token = env::var("PIXIV_REFRESH_TOKEN");
+        let mut client = PixivAppClient::new(&token.expect("expecting PIXIV_REFRESH_TOKEN variable for testing!"));
+        client.refresh_token().await;
+        let illust = client.illust_details(illust_id).await;
+        assert!(illust.is_ok(), "Expected illustration data: {:#?}", illust);
+        assert_eq!(illust.unwrap().id, illust_id);
+    }
 }
