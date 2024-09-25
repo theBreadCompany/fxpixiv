@@ -5,11 +5,12 @@ extern crate serde_json;
 use chrono::Local;
 use reqwest::header::{HeaderName, AUTHORIZATION, CONTENT_TYPE, USER_AGENT};
 use serde_json::Value;
-use std::sync::{Arc, Mutex};
+use tokio::sync::Mutex;
+use std::sync::Arc;
 
 mod models;
 
-struct PixivAppClient {
+pub struct PixivAppClient {
     /// bearer token
     access_token: Arc<Mutex<String>>,
     refresh_token: Arc<Mutex<String>>,
@@ -18,10 +19,10 @@ struct PixivAppClient {
 }
 
 impl PixivAppClient {
-    fn new(token: &str) -> Self {
+    pub fn new(token: String) -> Self {
         let client = Self {
             access_token: Arc::new(Mutex::new(String::new())),
-            refresh_token: Arc::new(Mutex::new(String::from(token))),
+            refresh_token: Arc::new(Mutex::new(token)),
             http_client: reqwest::Client::new(),
             host: String::from("https://app-api.pixiv.net"),
         };
@@ -37,7 +38,7 @@ impl PixivAppClient {
         let time = Local::now().format("%y-%m-%dT%H:%m:%s+00:00");
         let time_str = format!("{}", time);
         let cloned_refresh_token = Arc::clone(&self.refresh_token);
-        let cloned_refresh_token_str = &cloned_refresh_token.lock().unwrap();
+        let cloned_refresh_token_str = &cloned_refresh_token.lock().await;
 
         let client_id = "MOBrBDS8blbauoSck0ZfDbtuzpyT";
         let client_secret = "lsACyCD94FhDUtGTXi3QzcFE2uU1hqtDaKeqrdwj";
@@ -86,7 +87,7 @@ impl PixivAppClient {
             .get(url)
             .header(
                 AUTHORIZATION,
-                format!("Bearer {}", self.access_token.lock().unwrap()),
+                format!("Bearer {}", self.access_token.lock().await),
             )
             .header(HeaderName::from_lowercase(b"app-os").unwrap(), "ios")
             .header(
@@ -125,20 +126,18 @@ impl PixivAppClient {
 #[cfg(test)]
 mod client_tests {
     use super::*;
-    use std::{assert, assert_eq, env, panic};
+    use std::{assert, assert_eq, env};
 
     #[tokio::test]
     async fn login() {
         let token = env::var("PIXIV_REFRESH_TOKEN");
         let mut client = PixivAppClient::new(
-            &token.expect("expecting PIXIV_REFRESH_TOKEN variable for testing!"),
+            token.expect("expecting PIXIV_REFRESH_TOKEN variable for testing!"),
         );
         client.refresh_token().await;
         let cloned_access_token = Arc::clone(&client.access_token);
-        match cloned_access_token.lock() {
-            Ok(t) => assert!(!t.is_empty(), "Expected to receive token!"),
-            Err(_) => panic!("No token received!"),
-        };
+        let t = cloned_access_token.lock().await;
+        assert!(!t.is_empty(), "Expected to receive token!");
     }
 
     #[tokio::test]
@@ -146,7 +145,7 @@ mod client_tests {
         let illust_id = 122388293;
         let token = env::var("PIXIV_REFRESH_TOKEN");
         let mut client = PixivAppClient::new(
-            &token.expect("expecting PIXIV_REFRESH_TOKEN variable for testing!"),
+            token.expect("expecting PIXIV_REFRESH_TOKEN variable for testing!"),
         );
         client.refresh_token().await;
         let illust = client.illust_details(illust_id).await;

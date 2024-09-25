@@ -12,3 +12,7 @@ You can run the following command to test existing features:
 ```bash
 PIXIV_REFRESH_TOKEN= cargo test --lib
 ```
+
+## Notes
+
+This library may be available as a standalone crate in the future, depending on how many of the available endpoints get actually implemented.

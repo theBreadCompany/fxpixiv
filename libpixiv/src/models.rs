@@ -17,6 +17,7 @@ pub struct Illustration {
     pub restrict: i32,
     pub x_restrict: i32,
     pub image_urls: IllustrationURLs,
+    pub meta_single_page: Option<IllustrationMetaURL>,
     pub meta_pages: Vec<IllustrationURLsWrapper>,
     pub total_view: u32,
     pub total_bookmarks: u32,
@@ -40,26 +41,31 @@ pub struct User {
 
 #[derive(Serialize, Deserialize, std::fmt::Debug)]
 pub struct UserProfileImages {
-    medium: String,
+    pub medium: String,
 }
 
 #[derive(Serialize, Deserialize, std::fmt::Debug)]
 pub struct IllustrationURLsWrapper {
-    image_urls: IllustrationURLs,
+    pub image_urls: IllustrationURLs,
+}
+
+#[derive(Serialize, Deserialize, std::fmt::Debug)]
+pub struct IllustrationMetaURL {
+    pub original_image_url: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, std::fmt::Debug)]
 pub struct IllustrationURLs {
-    square_medium: String,
-    medium: String,
-    large: String,
-    original: Option<String>,
+    pub square_medium: String,
+    pub medium: String,
+    pub large: String,
+    pub original: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, std::fmt::Debug)]
 pub struct Tag {
-    name: String,
-    translated_name: Option<String>,
+    pub name: String,
+    pub translated_name: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, std::fmt::Debug)]
