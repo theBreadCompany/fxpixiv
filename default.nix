@@ -10,6 +10,10 @@ rustPlatform.buildRustPackage rec {
     lockFile = ./Cargo.lock;
   };
 
+  checkFlags = [
+    "--skip=client_tests::login --skip=client_tests::illust_details"
+  ];
+
   cargoSha256 = lib.fakeSha256; # Replace with the actual hash
 
   nativeBuildInputs = [ pkgs.pkg-config ];

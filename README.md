@@ -6,6 +6,13 @@ The pixiv embed fixer
 
 This project is still in development, please be patient until this project is actually usable.
 
+## build
+
+Simply use `cargo build` and/or `cargo run`.
+
+**Mind that you need a refresh token from pixiv to get API access.**
+
+
 ## nix build
 
 As this mainly runs on my NixOS server for now, so build and service files are included. 

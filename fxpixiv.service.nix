@@ -15,8 +15,13 @@ in
 
     port = mkOption {
       type = types.int;
-      default = 8000;
       description = "Port on which the fxpixiv embed helper listens.";
+    };
+
+    refreshToken = mkOption {
+      type = types.str;
+      default = "";
+      description = "Allows access to the Pixiv API.";
     };
   };
 
@@ -29,7 +34,10 @@ in
       serviceConfig.ExecStart = "${fxpixivApp}/bin/fxpixiv";
 
       # Set the port environment variable
-      serviceConfig.Environment = [ "ROCKET_PORT=${toString config.services.fxpixiv.port}" ];
+      serviceConfig.Environment = [ 
+        "ROCKET_PORT=${toString config.services.fxpixiv.port}"
+        "PIXIV_REFRESH_TOKEN=${toString config.services.fxpixiv.refreshToken}"
+      ];
 
       # Restart on failure
       serviceConfig.Restart = "always";
