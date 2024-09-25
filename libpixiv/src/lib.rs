@@ -51,7 +51,7 @@ impl PixivAppClient {
         let req = self.http_client
             .post("https://oauth.secure.pixiv.net/auth/token")
             .header(CONTENT_TYPE, "application/x-www-form-urlencoded")
-            .header(USER_AGENT, "PixivAndroidApp/5.0.115 (Android 6.0; PixivBot)")
+            .header(USER_AGENT, "PixivIOSApp/7.6.2 (iOS 12.2; iPhone9,1)")
             .header(HeaderName::from_lowercase(b"x-client-time").unwrap(), &time_str)
             .header(HeaderName::from_lowercase(b"x-client-hash").unwrap(), hash)
             .body(format!("grant_type=refresh_token&client_id={}&refresh_token={}&client_secret={}&get_secure_url=1", client_id, cloned_refresh_token_str, client_secret))
@@ -62,6 +62,7 @@ impl PixivAppClient {
             Ok(r) => r.text().await.unwrap(),
             Err(_e) => return,
         };
+
         let d: Value = serde_json::from_str(&r).unwrap();
 
         assert!(!d["response"]["access_token"].is_null());
