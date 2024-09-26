@@ -30,7 +30,7 @@ async fn fetch_illust(client: &Option<PixivAppClient>, illust_id: u32) -> Option
         if let Ok(illust) = client.illust_details(illust_id).await {
             let image = if illust.page_count == 1 { illust.meta_single_page.unwrap().original_image_url.unwrap() } else { illust.meta_pages[0].image_urls.large.clone() };
             return Some(Metadata {
-                image: image,
+                image: image.as_str().replace("pximg.net", "fixiv.net"),
                 title: illust.title,
                 desc: illust.caption,
             })
