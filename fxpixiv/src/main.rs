@@ -3,8 +3,8 @@
 
 use libpixiv::PixivAppClient;
 use maud::{html, DOCTYPE};
-use rocket::{http::Status, response::content::RawHtml, State};
-
+use rocket::{http::Status, response::content::RawHtml, tokio::{self, sync::Mutex}, State};
+use std::{sync::Arc, thread::sleep, time::Duration};
 
 struct Metadata {
     pub image: String,
@@ -13,7 +13,7 @@ struct Metadata {
 }
 
 #[get("/<path..>")]
-async fn handle_route(state: &State<Option<PixivAppClient>>, path: std::path::PathBuf) -> Result<RawHtml<String>, Status> {
+async fn handle_route(state: &State<Option<Arc<Mutex<PixivAppClient>>>>, path: std::path::PathBuf) -> Result<RawHtml<String>, Status> {
     let target = format!("https://pixiv.net/{}", path.display());
 
     if let Some(id) = path.file_name() {
@@ -25,9 +25,9 @@ async fn handle_route(state: &State<Option<PixivAppClient>>, path: std::path::Pa
 
 }
 
-async fn fetch_illust(client: &Option<PixivAppClient>, illust_id: u32) -> Option<Metadata> {
+async fn fetch_illust(client: &Option<Arc<Mutex<PixivAppClient>>>, illust_id: u32) -> Option<Metadata> {
     if let Some(client) = client {
-        if let Ok(illust) = client.illust_details(illust_id).await {
+        if let Ok(illust) = client.lock().await.illust_details(illust_id).await {
             let image = if illust.page_count == 1 { illust.meta_single_page.unwrap().original_image_url.unwrap() } else { illust.meta_pages[0].image_urls.large.clone() };
             return Some(Metadata {
                 image: image.as_str().replace("pximg.net", "fixiv.net"),
@@ -78,12 +78,22 @@ async fn create_page(source: &str, meta: &Metadata) -> Result<String, Status> {
 #[launch]
 async fn launch() -> _ {
 
-    let mut pixiv_client: Option<PixivAppClient> = None;
+    let mut pixiv_client: Option<Arc<Mutex<PixivAppClient>>> = None;
 
     if let Ok(token) = std::env::var("PIXIV_REFRESH_TOKEN") {
         let mut client = PixivAppClient::new(token);
         client.refresh_token().await; // TODO: refresh token on a regular basis
-        pixiv_client = Some(client);
+        pixiv_client = Some(Arc::new(Mutex::new(client)));
+    }
+
+    if let Some(pixiv_client) = &pixiv_client {
+        let background_client = Arc::clone(&pixiv_client);
+        tokio::spawn(async move {
+            loop {
+                background_client.lock().await.refresh_token().await;
+                sleep(Duration::from_secs(40 * 60));
+            }
+        });
     }
 
     rocket::build()
