@@ -2,7 +2,9 @@
 #[macro_use]
 extern crate rocket;
 
-use chrono::Local;
+use std::str::FromStr;
+
+use chrono::{DateTime, Duration, Utc};
 use libpixiv::PixivAppClient;
 use maud::{html, DOCTYPE};
 use rocket::{fairing::AdHoc, http::Status, response::content::RawHtml, State};
@@ -46,7 +48,7 @@ async fn fetch_illust(
 ) -> Option<Metadata> {
     if let Ok(row) = sqlx::query(
         "
-        SELECT p.large, i.title, i.desc
+        SELECT p.large, i.title, i.desc, i.expires_on
         FROM Illustrations i
         JOIN IllustrationPages p ON p.illust_id = i.id
         WHERE p.page_number = 0 AND i.id = ?
@@ -56,11 +58,23 @@ async fn fetch_illust(
     .fetch_one(&db.0)
     .await
     {
-        return Some(Metadata {
-            image: row.get(0),
-            title: row.get(1),
-            desc: row.get(2),
-        });
+        if Utc::now() >= DateTime::<Utc>::from_str(row.get(0)).unwrap() {
+            return Some(Metadata {
+                image: row.get(0),
+                title: row.get(1),
+                desc: row.get(2),
+            });
+        } else {
+            let _ = sqlx::query(
+                "
+            DELETE FROM Illustrations
+            WHERE id = $1
+            ",
+            )
+            .bind(illust_id)
+            .execute(&db.0)
+            .await;
+        }
     };
 
     if let Some(client) = client {
@@ -75,7 +89,8 @@ async fn fetch_illust(
                 .bind(illust.user.name)
                 .fetch_one(&db.0)
                 .await
-                .ok().expect("failed to insert user");
+                .ok()
+                .expect("failed to insert user");
 
             let illust_query = "
             INSERT OR REPLACE INTO Illustrations (id, title, description, user, expires_on)
@@ -86,7 +101,7 @@ async fn fetch_illust(
                 .bind(&illust.title)
                 .bind(&illust.caption)
                 .bind(illust.user.id)
-                .bind(Local::now().naive_utc().to_string())
+                .bind((Utc::now() + Duration::days(7)).to_string())
                 .execute(&db.0)
                 .await
                 .expect("failed to insert illustration");
@@ -100,9 +115,17 @@ async fn fetch_illust(
                     .bind(illust.image_urls.square_medium)
                     .bind(illust.image_urls.medium)
                     .bind(illust.image_urls.large)
-                    .bind(&illust.meta_single_page.as_ref().unwrap().original_image_url.clone().unwrap())
+                    .bind(
+                        &illust
+                            .meta_single_page
+                            .as_ref()
+                            .unwrap()
+                            .original_image_url
+                            .clone()
+                            .unwrap(),
+                    )
                     .bind(0)
-                    .bind(illust.id) 
+                    .bind(illust.id)
                     .execute(&db.0)
                     .await
                     .expect("failed to insert page");
