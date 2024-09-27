@@ -10,3 +10,5 @@ scraper = "0.20.0"
 maud = "0.26.0"
 libpixiv = { path = "../libpixiv" }
 rocket = { version = "0.5.1", features = ["json"] }
+rocket_db_pools = { version = "0.2.0", features = ["sqlx_sqlite"] }
+chrono = "0.4.38"

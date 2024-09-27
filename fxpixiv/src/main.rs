@@ -1,10 +1,19 @@
 #![deny(elided_lifetimes_in_paths)]
-#[macro_use] extern crate rocket;
+#[macro_use]
+extern crate rocket;
 
+use chrono::Local;
 use libpixiv::PixivAppClient;
 use maud::{html, DOCTYPE};
-use rocket::{http::Status, response::content::RawHtml, State};
+use rocket::{fairing::AdHoc, http::Status, response::content::RawHtml, State};
+use rocket_db_pools::{
+    Database,
+    {sqlx, sqlx::Row},
+};
 
+#[derive(Database)]
+#[database("pixiv")]
+struct PixivDB(sqlx::SqlitePool);
 
 struct Metadata {
     pub image: String,
@@ -13,27 +22,116 @@ struct Metadata {
 }
 
 #[get("/<path..>")]
-async fn handle_route(state: &State<Option<PixivAppClient>>, path: std::path::PathBuf) -> Result<RawHtml<String>, Status> {
+async fn handle_route(
+    client: &State<Option<PixivAppClient>>,
+    db: &State<PixivDB>,
+    path: std::path::PathBuf,
+) -> Result<RawHtml<String>, Status> {
     let target = format!("https://pixiv.net/{}", path.display());
 
     if let Some(id) = path.file_name() {
-        let meta = fetch_illust(state, id.to_str().unwrap().parse::<u32>().unwrap());
-        Ok(RawHtml(create_page(&target, &meta.await.unwrap()).await.unwrap()))
+        let meta = fetch_illust(client, &db, id.to_str().unwrap().parse::<u32>().unwrap());
+        Ok(RawHtml(
+            create_page(&target, &meta.await.unwrap()).await.unwrap(),
+        ))
     } else {
         Err(Status::InternalServerError)
     }
-
 }
 
-async fn fetch_illust(client: &Option<PixivAppClient>, illust_id: u32) -> Option<Metadata> {
+async fn fetch_illust(
+    client: &Option<PixivAppClient>,
+    db: &PixivDB,
+    illust_id: u32,
+) -> Option<Metadata> {
+    if let Ok(row) = sqlx::query(
+        "
+        SELECT p.large, i.title, i.desc
+        FROM Illustrations i
+        JOIN IllustrationPages p ON p.illust_id = i.id
+        WHERE p.page_number = 0 AND i.id = ?
+        ",
+    )
+    .bind(illust_id)
+    .fetch_one(&db.0)
+    .await
+    {
+        return Some(Metadata {
+            image: row.get(0),
+            title: row.get(1),
+            desc: row.get(2),
+        });
+    };
+
     if let Some(client) = client {
         if let Ok(illust) = client.illust_details(illust_id).await {
-            let image = if illust.page_count == 1 { illust.meta_single_page.unwrap().original_image_url.unwrap() } else { illust.meta_pages[0].image_urls.large.clone() };
+            let user_query = "
+            INSERT OR REPLACE INTO User (id, name) 
+            VALUES ($1, $2) 
+            RETURNING id
+            ";
+            let _ = sqlx::query(user_query)
+                .bind(illust.user.id)
+                .bind(illust.user.name)
+                .fetch_one(&db.0)
+                .await
+                .ok().expect("failed to insert user");
+
+            let illust_query = "
+            INSERT OR REPLACE INTO Illustrations (id, title, description, user, expires_on)
+            VALUES ($1, $2, $3, $4, $5)
+            ";
+            let _ = sqlx::query(&illust_query)
+                .bind(illust.id)
+                .bind(&illust.title)
+                .bind(&illust.caption)
+                .bind(illust.user.id)
+                .bind(Local::now().naive_utc().to_string())
+                .execute(&db.0)
+                .await
+                .expect("failed to insert illustration");
+
+            let pages_query = "
+            INSERT OR REPLACE INTO IllustrationPages (square_medium, medium, large, original, page_number, illust_id) 
+            VALUES ($1, $2, $3, $4, $5, $6)
+            ";
+            if illust.meta_pages.is_empty() {
+                let _ = sqlx::query(pages_query)
+                    .bind(illust.image_urls.square_medium)
+                    .bind(illust.image_urls.medium)
+                    .bind(illust.image_urls.large)
+                    .bind(&illust.meta_single_page.as_ref().unwrap().original_image_url.clone().unwrap())
+                    .bind(0)
+                    .bind(illust.id) 
+                    .execute(&db.0)
+                    .await
+                    .expect("failed to insert page");
+            } else {
+                let _ = illust.meta_pages.iter().enumerate().map(|page| async move {
+                    let _ = sqlx::query(pages_query)
+                        .bind(&page.1.image_urls.square_medium)
+                        .bind(&page.1.image_urls.medium)
+                        .bind(&page.1.image_urls.large)
+                        .bind(&page.1.image_urls.original)
+                        .bind(page.0.to_string())
+                        .bind(illust.id)
+                        .execute(&db.0)
+                        .await
+                        .expect("failed to insert page");
+                });
+            }
+
+            let image = if illust.page_count == 1 {
+                illust.meta_single_page.unwrap().original_image_url.unwrap()
+            } else {
+                illust.meta_pages[0].image_urls.large.clone()
+            };
+
             return Some(Metadata {
                 image: image,
                 title: illust.title,
                 desc: illust.caption,
-            })
+            });
         }
     }
 
@@ -77,7 +175,6 @@ async fn create_page(source: &str, meta: &Metadata) -> Result<String, Status> {
 
 #[launch]
 async fn launch() -> _ {
-
     let mut pixiv_client: Option<PixivAppClient> = None;
 
     if let Ok(token) = std::env::var("PIXIV_REFRESH_TOKEN") {
@@ -88,5 +185,41 @@ async fn launch() -> _ {
 
     rocket::build()
         .manage(pixiv_client)
+        .attach(PixivDB::init())
+        .attach(AdHoc::on_ignite("Database Init", |rocket| {
+            Box::pin(async {
+                let db = PixivDB::fetch(&rocket).expect("Database connection failed");
+                sqlx::query(
+                    "
+                    CREATE TABLE IF NOT EXISTS User (
+                        id INTEGER UNIQUE PRIMARY KEY,
+                        name TEXT NOT NULL
+                    );
+                    CREATE TABLE IF NOT EXISTS Illustrations (
+                        id INTEGER UNIQUE PRIMARY KEY,
+                        title TEXT NOT NULL,
+                        description TEXT NOT NULL,
+                        user INTEGER NOT NULL,
+                        expires_on TIMESTAMP,
+                        FOREIGN KEY (user) REFERENCES User(id)
+                    );
+                    CREATE TABLE IF NOT EXISTS IllustrationPages (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        illust_id INTEGER NOT NULL,
+                        page_number INTEGER NOT NULL,
+                        square_medium TEXT NOT NULL,
+                        medium TEXT NOT NULL,
+                        large TEXT NOT NULL,
+                        original TEXT NOT NULL,
+                        FOREIGN KEY (illust_id) REFERENCES Illustrations(id)
+                    );
+                    ",
+                )
+                .execute(&db.0)
+                .await
+                .expect("Database init failed!");
+                rocket
+            })
+        }))
         .mount("/", routes![handle_route])
 }
