@@ -32,11 +32,11 @@ pub struct Illustration {
 
 #[derive(Serialize, Deserialize, std::fmt::Debug)]
 pub struct User {
-    id: i32,
-    name: String,
-    account: String,
-    profile_image_urls: UserProfileImages,
-    is_followed: bool,
+    pub id: i32,
+    pub name: String,
+    pub account: String,
+    pub profile_image_urls: UserProfileImages,
+    pub is_followed: bool,
 }
 
 #[derive(Serialize, Deserialize, std::fmt::Debug)]

@@ -79,7 +79,7 @@ impl PixivAppClient {
     pub async fn illust_details(
         &self,
         illust_id: u32,
-    ) -> Result<models::Illustration, Box<dyn std::error::Error>> {
+    ) -> Result<models::Illustration, Box<dyn std::error::Error + Send + Sync>> {
         let url = format!("{}/v1/illust/detail", self.host);
         let illust_id_str = illust_id.to_string();
 

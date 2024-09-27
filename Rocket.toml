@@ -7,4 +7,4 @@ address = "0.0.0.0"
 port = 5470
 
 [default.databases]
-illustrations = { url = "sqlite:fxpixiv.db" }
+pixiv = { url = "sqlite:fxpixiv.db" }
