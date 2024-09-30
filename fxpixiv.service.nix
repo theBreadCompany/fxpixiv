@@ -35,15 +35,39 @@ in
 
       # Set the port environment variable
       serviceConfig.Environment = [ 
+        "ROCKET_ENV=release"
         "ROCKET_PORT=${toString config.services.fxpixiv.port}"
         "PIXIV_REFRESH_TOKEN=${toString config.services.fxpixiv.refreshToken}"
       ];
 
       # Restart on failure
-      serviceConfig.Restart = "always";
+      serviceConfig.WorkingDirectory = "/var/lib/fxpixiv";
+      serviceConfig.ReadWritePaths = [ "/var/lib/fxpixiv" ];
+      serviceConfig.Restart = "on-failure";
+      serviceConfig.User = "fxpixiv";
+      serviceConfig.Group = "fxpixiv";
 
       # Ensure the service starts after the network is up
       after = [ "network.target" ];
     };
+
+    systemd.tmpfiles.rules = [ 
+      "d /var/lib/fxpixiv 0755 fxpixiv fxpixiv" 
+      ''f /var/lib/Rocket.toml 0644 fxpixiv fxpixiv - <<EOF
+          [release]
+          log_level = "critical"
+          
+          [default.databases.pixiv]
+          url = "sqlite:fxpixiv.db"
+	  EOF
+      ''
+    ];
+
+    users.users.fxpixiv = {
+      isSystemUser = true;
+      home = "/var/lib/fxpixiv";
+      group = "fxpixiv";
+    };
+    users.groups.fxpixiv = {};
   };
 }

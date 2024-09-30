@@ -4,9 +4,6 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-tl = "0.7.8"
-json = "0.12.4"
-scraper = "0.20.0"
 maud = "0.26.0"
 libpixiv = { path = "../libpixiv" }
 rocket = { version = "0.5.1", features = ["json"] }

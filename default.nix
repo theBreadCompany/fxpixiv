@@ -1,4 +1,4 @@
-{ pkgs, lib, rustPlatform }:
+{ pkgs ? import <nixpkgs> {}, lib ? pkgs.lib, rustPlatform ? pkgs.rustPlatform }:
 
 rustPlatform.buildRustPackage rec {
   pname = "fxpixiv";

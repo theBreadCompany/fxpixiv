@@ -48,7 +48,7 @@ async fn fetch_illust(
 ) -> Option<Metadata> {
     if let Ok(row) = sqlx::query(
         "
-        SELECT p.large, i.title, i.desc, i.expires_on
+        SELECT p.medium, i.title, i.desc, i.expires_on
         FROM Illustrations i
         JOIN IllustrationPages p ON p.illust_id = i.id
         WHERE p.page_number = 0 AND i.id = ?
@@ -147,7 +147,7 @@ async fn fetch_illust(
             let image = if illust.page_count == 1 {
                 illust.meta_single_page.unwrap().original_image_url.unwrap()
             } else {
-                illust.meta_pages[0].image_urls.large.clone()
+                illust.meta_pages[0].image_urls.original.clone()
             };
 
             return Some(Metadata {
