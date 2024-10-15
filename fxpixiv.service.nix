@@ -34,11 +34,15 @@ in
       serviceConfig.ExecStart = "${fxpixivApp}/bin/fxpixiv";
 
       # Set the port environment variable
-      serviceConfig.Environment = [ 
-        "ROCKET_ENV=release"
-        "ROCKET_PORT=${toString config.services.fxpixiv.port}"
-        "PIXIV_REFRESH_TOKEN=${toString config.services.fxpixiv.refreshToken}"
-      ];
+      serviceConfig.EnvironmentFile = pkgs.writeTextFile {
+        name = "fxpixiv.env";
+        text = ''
+          "ROCKET_ENV=release"
+          "ROCKET_PORT=${toString config.services.fxpixiv.port}"
+          "PIXIV_REFRESH_TOKEN=${toString config.services.fxpixiv.refreshToken}"
+        '';
+        meta.mode = "0600";
+      };
 
       # Restart on failure
       serviceConfig.WorkingDirectory = "/var/lib/fxpixiv";
